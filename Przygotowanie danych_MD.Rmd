@@ -1,0 +1,194 @@
+---
+title: "ANALIZA DANYCH-PROJEKT GRUPA J"
+
+```{r setup, message=FALSE, warning=FALSE, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen = 999, digits=6) 
+if(!require('DMwR')) install.packages("https://cran.r-project.org/src/contrib/Archive/DMwR/DMwR_0.4.1.tar.gz", repos=NULL, type="source", dependencies=TRUE)
+library(dplyr) # ładuję biblioteki
+library(ggplot2)
+library(summarytools)
+library(rmdformats)
+library(validate)
+library(validatetools)
+library(dcmodify)
+library(errorlocate)
+library(deductive)
+library(VIM)
+library(simputation)
+library(lumberjack)
+library(ISLR) 
+library(dlookr)
+library(xts)
+library(quantmod)
+library(ROCR)
+library(DMwR)
+library(Information)
+library(scorecard)
+library(dlookr)
+library(editrules)
+library(VIM)
+library(deducorrect)
+library(ISLR) 
+library(janitor)
+library(naniar)
+library(mice)
+library(editrules)
+library(DMwR2)
+library(outliers)
+library(moments)
+```
+
+Zlikwidujmy spacje w nazwach kolumn oraz oczyśćmy dane funkcją clean_nemes. Stwórzmy funkcję, która wstawia w puste miejsca wartości NA.
+
+```{r}
+rowery <- clean_names(rowery) 
+is.special <- function(x){
+  if (is.numeric(x)) !is.finite(x) else is.na(x)}
+  sapply(rowery, is.special)
+```
+
+Sprawdźmy, czy w naszych danych są jakieś braki. 
+
+```{r}
+sum(complete.cases(rowery)) #952 pełnych wierszy, czyli mamy 48 wierszy, w ktorych sa braki
+manyNAs(rowery) #689 wiersz zawiera najwiecej brakow, bo az 3, wiec moze nalezy rozwazyc jego usuniecie
+sum(is.na(rowery))
+miss_var_summary(rowery) #widzimy, że braki wystepuja jedynie dla zmiennych gender (11), cars(9),children (8), age(8),marital_status(7)
+#income(6) i home_owner(4). Dla pozostalych zmiennych nie wystepuja braki
+rowery %>% 
+  miss_case_table()
+md.pattern(rowery) #wykres do zilustrowania brakow kazdej zmiennej
+which(is.na(rowery$gender)) #4, 155, 336, 602, 689, 696, 868, 909, 952, 974, 998- numery wierszy, w ktorych sa braki dla zmiennej gender
+which(is.na(rowery$cars)) #13, 197, 203, 352, 449, 512, 562, 616, 934-numery wierszy, w ktorych sa braki dla zmiennej cars
+which(is.na(rowery$children)) #118, 218, 387, 550, 639, 689, 806, 961- numery wierszy, w ktorych sa braki dla zmiennej children
+which(is.na(rowery$age)) #10,  99, 226, 372, 555, 689, 771, 987-numery wierszy, w ktorych sa braki dla zmiennej age
+which(is.na(rowery$marital_status)) #9,  28,  50,  99, 151, 235, 302-numery wierszy, w ktorych sa braki dla zmiennej marital_status
+which(is.na(rowery$income)) #10, 111, 192, 302, 442, 510-numery wierszy, w ktorych sa braki dla zmiennej income
+which(is.na(rowery$home_owner)) #7, 366, 647, 944-numery wierszy, w ktorych sa braki dla zmiennej home_owner
+```
+
+Poprzez wywołanie podstawowych statystyk sprawdźmy, czy nasze zmienne są wiarygodne. 
+```{r}
+summary(rowery)
+view(dfSummary(rowery))
+descr(rowery)
+```
+
+Stwórzmy regułę dla naszego zbioru danych oraz sprawdźmy, czy jest ona spełniona.
+
+```{r}
+rules <- validator(age > 0, gender %in% c('Female','Male')
+                  , income >= 0, children >= 0, cars >= 0)
+cf <- confront(rowery, rules, key="id")
+summary(cf)
+barplot(cf, main="rowery")
+#as.data.frame(cf) %>% head()
+
+#Inny sposob
+RULE <- editset(c("age > 0","gender %in% c('Female','Male')"
+                  , "income >= 0", "children >= 0", "cars >= 0"))
+RULE
+
+summary(violatedEdits(RULE, rowery))
+rowery[localizeErrors(RULE, rowery)$adapt] <- NA
+
+
+#Reguły w naszym zbiorze danych są spełnione, więc nie musimy zamieniać błędnych pól na wartości NA 
+```
+
+
+Zamieńmy braki w zmiennych dotyczących dochodu, wieku, liczby posidanych dzieci i samochodów za pomocą średniej. Ze względu na specyfikę danych age, children i cars, wartości te nie powinny mieć żadnych miejsc po przecinku, gdyż nie możemy posiadać np. 1.5 dziecka. 
+
+```{r}
+#zmienna income
+rowery %>% filter(is.na(income)) %>% head
+rowery[is.na(rowery$income), "income"] <- mean(rowery$income, na.rm = T)
+# Inny sposob
+dochod<-imputate_na(rowery, income, method = "mean")
+summary(dochod)
+plot(dochod)
+
+rowery %>% filter(is.na(age)) %>% head
+rowery[is.na(rowery$age), "age"] <- round(mean(rowery$age, na.rm = T), digits=0)
+
+rowery %>% filter(is.na(cars)) %>% head
+rowery[is.na(rowery$cars), "cars"] <- round(mean(rowery$cars, na.rm = T), digits=0)
+
+rowery %>% filter(is.na(children)) %>% head
+rowery[is.na(rowery$children), "children"] <- round(mean(rowery$children, na.rm = T), digits=0)
+
+```
+
+Teraz, kiedy wypełniliśmy braki w zmiennych ilościowych, możemy przejść do wypełniania braków w zmiennych jakościowych. Ze względu na to, że nasze dane jakościowe, które posiadają braki mają jedynie po dwie kategorie, sprawdzone zostanie, która kategoria występuje częściej, a więc wartości NA uzupełnione zostaną dominantą. 
+
+```{r}
+unique(rowery$home_owner) # dwie kategorie- tak i nie
+unique(rowery$marital_status) # dwie kategorie- zamezny i singiel
+unique(rowery$gender) # dwie kategorie- kobieta i mezczyzna
+
+mice_plot <-aggr(rowery, col=c('navyblue', 'yellow'),numbers=TRUE, sortVars=TRUE, labels=names(rowery), cex.axis=7, ylab=c("Histogram of missing data","Pattern")) #wykres obrazujacy braki danych
+
+#uzupelnianie danych- pakiet 'mice'
+imputed_rowery <-mice(rowery, m=1, method='pmm')
+rowery <-complete(imputed_rowery)
+imputed_rowery$imp$home_owner
+imputed_rowery
+
+#uzupelnianie danych dominanta
+rowery[is.na(rowery$home_owner), "home_owner"] <- "Yes" #68,5% odpowiedzialo 'Yes', wiec uzupeniamy braki wartoscia 'Yes'
+rowery[is.na(rowery$marital_status), "marital_status"] <- "Married" #53,9% odpowiedzilo 'Married', wiec uzupelniamy braki wartoscia 'Married'
+rowery[is.na(rowery$gender), "gender"] <- "Male" #50,6% odpowiedzialo 'Male', wiec uzupelniamy braki wartoacia 'Male'
+
+view(dfSummary(rowery)) #Wywolujemy tabelke podsumowujaca nasze dane. Widzimy, ze wszystkie dane zostaly uzupelnione.
+```
+
+Teraz należy sprawdzić nasz zbiór danych pod względem występowania wartości odstających.
+
+```{r}
+#mozemy stworzyc funkcje, ktora bedzie wykrywac odstajace obserwacje
+find_outliers <- function(rowery, k = 1.5) {
+quantiles <- quantile(rowery, c(0.25, 0.5, 0.75))
+diff <- k * (quantiles[3] - quantiles[1])
+lb <- quantiles[1] - diff 
+ub <- quantiles[3] + diff
+  
+is_outlier <- function(el) {
+    el < lb || ub < el  
+  }}
+#Inne metody
+out <-boxplot.stats(rowery$income)$out #mamy 10 wartosci odstajacych dla income
+test <- grubbs.test(rowery$income)
+test #test Grubba'a potwierdza, ze najwyzsza wartosc 170 000 jest odstajaca
+test1 <- grubbs.test(rowery$income, opposite = TRUE)
+test1 #najmniejsza wartosc nie jest odstajaca
+boxplot(rowery$income, col = "blue",
+  ylab = "income",
+  main = "Boxplot of income")
+mtext(paste("Outliers: ", paste(out, collapse = ", "))) #mozemy zwizualizowac wartosci odstajacae na wykresie wraz z opisem, ktore z nich sa odstajace
+
+boxplot.stats(rowery$age)$out #mamy 4 wartosci odstajace dla age
+test <- grubbs.test(rowery$age)
+test #test potwierdza, ze najwyzsza wartosc 89 jest odstajaca
+```
+
+W następnym kroku zajmiemy się obserwacjami odstającymi dla zmiennych income i age. Wykorzystamy metodę capping.  
+
+```{r}
+#income
+qnt <- quantile(rowery$income, probs=c(.25, .75), na.rm = T)
+caps <- quantile(rowery$income, probs=c(.05, .95), na.rm = T)
+H <- 1.5 * IQR(rowery$income, na.rm = T)
+rowery$income[rowery$income < (qnt[1] - H)] <- caps[1]
+rowery$income[rowery$income > (qnt[2] + H)] <- caps[2]
+boxplot.stats(rowery$income)$out #brak wartosci odstajacych dla income
+
+#age
+qnt <- quantile(rowery$age, probs=c(.25, .75), na.rm = T)
+caps <- quantile(rowery$age, probs=c(.05, .95), na.rm = T)
+H <- 1.5 * IQR(rowery$age, na.rm = T)
+rowery$age[rowery$age < (qnt[1] - H)] <- caps[1]
+rowery$age[rowery$age > (qnt[2] + H)] <- caps[2]
+boxplot.stats(rowery$age)$out #brak wartosci odstajacych dla age
+```
+
