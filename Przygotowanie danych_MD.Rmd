@@ -39,6 +39,7 @@ library(DMwR2)
 library(outliers)
 library(moments)
 library(hrbrthemes)
+library(RColorBrewer)
 ```
 
 Zlikwidujmy spacje w nazwach kolumn oraz oczyśćmy dane funkcją clean_names. Stwórzmy funkcję, która wstawia w puste miejsca wartości NA.
@@ -194,33 +195,45 @@ rowery$age[rowery$age > (qnt[2] + H)] <- caps[2]
 boxplot.stats(rowery$age)$out #brak wartosci odstajacych dla age
 ```
 Następnym krokiem po dokonaniu czyszczenia danych oraz upewnieniu się co do braku sytuacji, w której brakuje danych, będzie utworzenie wizualizacji danych. 
+
 ```{r}
 dw1<-rowery%>%
   group_by(age, gender)%>%
   summarize(meaninc=mean(income))
-ggplot(dw1, aes(age, meaninc))+geom_line()+geom_point(colour="red")+facet_wrap(~gender)+labs(x="Wiek", y="Średnie dochody")
+ggplot(dw1, aes(age, meaninc))+geom_line()+geom_point(colour="red")+facet_wrap(~gender)+labs(x="Wiek", y="Średnie dochody")+geom_smooth(method="lm")+ggtitle("Średni dochód w zależności od wieku oraz płci")
+```
+```{r}
+ggplot(rowery, aes(age, income))+stat_sum(alpha=0.4)+scale_size(range=c(1,5))+ggtitle("Występowanie obserwacji o określonym wieku oraz poziomie dochodów")+labs(x="Wiek", y="Dochód", size="Występowanie")
 ```
 
 
 ```{r}
-ggplot(rowery, aes(x=cars, fill=region))+geom_bar(position="dodge")+labs(x="Ilość posiadanych samochodów", y="Występowanie", fill="Region")
+ggplot(rowery, aes(x=cars, fill=region))+geom_bar(position="dodge", color='black')+labs(x="Ilość posiadanych samochodów", y="Występowanie", fill="Region")+ggtitle("Ilość obserwacji o określonej ilości samochodów w zależności od regionu")
 ```
 ```{r}
-ggplot(rowery, aes(age, fill=region))+geom_density(alpha=0.25)+labs(x="Wiek",y="Zagęszczenie", fill="Region")
+ggplot(rowery, aes(age, fill=region))+geom_density(alpha=0.25)+labs(x="Wiek",y="Zagęszczenie", fill="Region")+ggtitle("Zagęszczenie obserwacji o określonym poziomie wieku w zależności od regionu")
 ```
 ```{r}
-ggplot(rowery, aes(income, fill=occupation))+geom_histogram(bins=20)+facet_wrap(~occupation, nrow=5)+labs(x="Dochód", y="Występowanie", fill="Praca")+theme(legend.position = 'none')
+ggplot(rowery, aes(income, fill=occupation))+geom_histogram(bins=20, color='black')+facet_wrap(~occupation, nrow=5)+labs(x="Dochód", y="Występowanie", fill="Praca")+theme(legend.position = 'none')+ggtitle("Wystepowanie obserwacji o określonym poziomie dochodów w zależności od rodzaju zawodu")
+```
+```{r}
+ggplot(rowery, aes(gender, income)) +geom_boxplot(aes(fill=gender))+stat_boxplot(geom="errorbar", position="dodge")+stat_summary(aes(ymin=after_stat(y),ymax=after_stat(y)),fun=mean)+ggtitle("Mediana dochodów, maksymalny, minimalny oraz średni dochód w zależności od płci")+theme(legend.position='none')
 ```
 
 ```{r}
-ggplot(rowery, aes(occupation, fill=occupation))+geom_bar()+facet_wrap(~education, nrow=5)+labs(x="Zatrudnienie", y="Występowanie")+theme(legend.position= 'none')
+ggplot(rowery, aes(cars, fill=purchased_bike))+geom_histogram(bins=5, position="dodge", color='black')+facet_wrap(~purchased_bike)+theme(legend.position='none')+labs(x="Ilość posiadanych samochodów", y="Występowanie")+ggtitle("Ilość posiadanych samochodów w zależności od posiadania roweru")
 ```
 
 ```{r}
-ggplot(rowery, aes(marital_status, age))+geom_boxplot(aes(fill=marital_status))+stat_boxplot(geom="errorbar", position="dodge")+stat_summary(aes(ymin=..y..,ymax=..y..), fun=mean)
-```
+ggplot(rowery, aes(occupation, fill=occupation))+geom_bar(color='black')+facet_wrap(~education, nrow=5)+labs(x="Zatrudnienie", y="Występowanie")+theme(legend.position= 'none')+ggtitle("Występowanie obserwacji o poszczególnym rodzaju wykonywanej pracy według wykształcenia")
 ```
 ```{r}
-ggplot(rowery, aes(gender, income)) +geom_boxplot(aes(fill=gender))+stat_boxplot(geom="errorbar", position="dodge")+stat_summary(aes(ymin=..y..,ymax=..y..),fun=mean)
+ggplot(rowery, aes(occupation, education, fill=income))+geom_tile(color='black')+scale_fill_gradient2(low="white", mid="yellow", high="red")+ggtitle("Średni dochód według wykształcenia oraz rodzaju pracy")
 ```
+
+```{r}
+ggplot(rowery, aes(marital_status, age))+geom_boxplot(aes(fill=marital_status))+stat_boxplot(geom="errorbar", position="dodge")+stat_summary(aes(ymin=..y..,ymax=..y..), fun=mean)+labs(x="Stan cywilny", y="Wiek")+theme(legend.position='none')+ggtitle("Mediana, maksimum, minimum oraz średnia wieku według stanu cywilnego")
+```
+```
+
 
