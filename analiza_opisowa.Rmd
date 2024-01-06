@@ -1,0 +1,43 @@
+
+
+Poniżej przedstawione zostały wykresy, tabele liczebności, czy też częstości poszczególnych zmiennych. Ma to na celu przedstawienie informacji o tym, ile osób przynależy do danej kategorii zmiennej.
+
+```{r}
+# AGE
+etykiety<-c("20-30 lat","30-40 lat","40-50 lat","50-60 lat","60-70 lat","70-80 lat")
+limits<-cut(rowery$age,seq(20,80,by=10),labels=etykiety)
+tabela1<-freq(limits,type="html")
+tabela1
+# wizualnie
+ggplot(rowery, aes(x = age)) +
+  geom_histogram(binwidth = 2, fill = "blue", color = "red", alpha = 0.8) +
+  labs(title = "Age Distribution", x = "Age", y = "Frequency")
+
+# INCOME
+etykiety1<-c("0-25 000", "25 000-50 000", "50 000-75 000", "75 000-100 000", "100 000-125 000", "125 000-150 000")
+limits1<-cut(rowery$income,seq(0,150000,by=25000),labels=etykiety1)
+tabela2<-freq(limits1,type="html")
+tabela2
+# wizualnie
+hist(rowery$income, breaks="FD", col="green", probability = TRUE,
+     main="INCOME")
+
+# EDUCATION
+ggplot(rowery, aes(x = factor(education), fill = factor(education))) +
+  geom_bar() +
+  labs(title = "Education Distribution", x = "Education Level", y = "Count") +
+  theme_minimal()
+
+# REGION
+ggplot(rowery, aes(x = factor(region), fill = factor(region))) +
+  geom_bar() +
+  labs(title = "Region Distribution", x = "Region", y = "Count") +
+  theme_minimal()
+
+# liczebnosc pozostaych zmiennych (zarowno liczbowa, jak i procentowa mozemy odczytac z tabelki)
+view(dfSummary(rowery)) 
+
+```
+Kolejnym etapem będzie przedstawienie statystyk opisowych za pomocą zbiorczej tabelki.
+
+
