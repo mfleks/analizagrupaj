@@ -1,4 +1,6 @@
 
+library(corrplot)
+library(DT)
 
 Poniżej przedstawione zostały wykresy, tabele liczebności, czy też częstości poszczególnych zmiennych. Ma to na celu przedstawienie informacji o tym, ile osób przynależy do danej kategorii zmiennej.
 
@@ -35,9 +37,25 @@ ggplot(rowery, aes(x = factor(region), fill = factor(region))) +
   theme_minimal()
 
 # liczebnosc pozostaych zmiennych (zarowno liczbowa, jak i procentowa mozemy odczytac z tabelki)
-view(dfSummary(rowery)) 
+dfSummary(view(rowery)) 
 
 ```
-Kolejnym etapem będzie przedstawienie statystyk opisowych za pomocą zbiorczej tabelki.
+Kolejnym etapem będzie przedstawienie statystyk opisowych dla zmiennych ilościowych za pomocą zbiorczej tabelki.
+
+```{r}
+descr(rowery) #przedstawienie podstawowych statystyk opisowych dla zmiennych numerycznych
+```
+
+```{r}
+#korelacja pomiedzy zmiennymi ilosciowymi
+
+cor((rowery[,c(4,5,9,12)]), method="pearson")
+corrplot(cor(rowery[,c(4,5,9,12)]), method = "number", type = "upper", diag =FALSE)
+corr_matrix<-cor(rowery[,c(4,5,9,12)])
+corrplot(corr_matrix, method="color")
+
+#korelacja pomiedzy zmiennymi jakosciowymi
+
+```
 
 
