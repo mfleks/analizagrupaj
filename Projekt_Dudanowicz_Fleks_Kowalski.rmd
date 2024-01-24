@@ -1,0 +1,805 @@
+---
+title: "ANALIZA DANYCH-PROJEKT"
+author: "Maciej Fleks, Małgorzata Dudanowicz, Krzysztof Kowalski"
+date: "`r Sys.Date()`"
+output:
+  rmdformats::downcute:
+    self_contained: true
+    default_style: "light"
+    downcute_theme: "default"
+---
+
+```{r setup, include=FALSE}
+## Global options
+knitr::opts_chunk$set(cache = TRUE)
+#biblioteki
+library(dplyr) 
+library(ggplot2)
+library(summarytools)
+library(validate)
+library(validatetools)
+library(dcmodify)
+library(errorlocate)
+library(deductive)
+library(simputation)
+library(lumberjack)
+library(ISLR)
+library(xts)
+library(quantmod)
+library(ROCR)
+library(DMwR)
+library(Information)
+library(scorecard)
+library(editrules)
+library(VIM)
+library(deducorrect)
+library(ISLR) 
+library(janitor)
+library(naniar)
+library(mice)
+library(editrules)
+library(DMwR2)
+library(outliers)
+library(moments)
+library(classInt)
+library(corrplot)
+library(ggpubr)
+library(ggstatsplot)
+library(rstantools)
+library(readxl)
+library(ROCR)
+library(mfx)
+```
+
+Na początku wczytujemy dane.
+
+```{r}
+rowery<-read_excel("sklep_rowerowy.xlsx")
+```
+
+# **SKLEP ROWEROWY**
+
+Analizowany zbiór danych zawiera informacje na temat klientów sklepu rowerowego. Z jego pomocą możemy uzyskać informacje na temat wieku, dochodu, płci, liczby posiadanych dzieci czy np. regionu pochodzenia klientów sklepu. Celem projektu jest przeprowadzenie kompleksowej analizy danych, która obejmować będzie kilka kluczowych etapów, a mianowicie: czyszczenie danych, wizualizację, analizę opisową i wnioskowanie statystyczne.
+
+## I ETAP - CZYSZCZENIE DANYCH
+
+### 1. Przegląd danych
+
+Po wyświetleniu początkowych wierszy obserwujemy m.in. spacje w nazwach kolumn naszych zmiennych. Aby się ich pozbyć korzystamy z funkcji clean_names z pakietu 'janitor', która służy do przekształcania nazw kolumn w ramce danych w formę bardziej czytelną i zgodą z konwencją.
+
+```{r}
+head(rowery) 
+rowery <- clean_names(rowery) 
+```
+
+#### 1. Sprawdzenie występowania brakujących obserwacji NA
+
+Poniżej przeprowadzona została analiza występowania wartości brakujących dla poszczególnych zmiennych. Badanie obecności wartości NA jest ważne dla zapewnienia poprawności analizy, utrzymania jakości danych i generowania precyzyjnych wyników. To kluczowy etap w procesie przetwarzania i przygotowywania danych do dalszej analizy. Poprawne zarządzanie wartościami brakującymi pozwala na uniknięcie błędnych interpretacji oraz zapewnia solidne fundamenty do analiz statystycznych czy modelowania danych.
+
+```{r}
+sum(complete.cases(rowery)) 
+```
+
+W naszej bazie danych zidentyfikowaliśmy 952 wiersze, w których wszystkie dane są kompletnie wypełnione. Niemniej jednak, istnieje 48 wierszy, w których co najmniej jedna wartość jest brakująca (oznaczona jako NA). Oznacza to, że wiersze te zawierają pewną ilość niekompletnych informacji. Procentowy udział wierszy z brakującymi danymi w stosunku do ogólnej liczby rekordów wynosi 4.8%.
+
+```{r}
+manyNAs(rowery) 
+```
+
+Widzimy, że najwięcej braków danych zawiera wiersz 689.
+
+```{r}
+sum(is.na(rowery)) 
+```
+
+Zauważmy, że ogółem mamy 53 braki danych w bazie. Biorąc pod uwagę, że liczba wierszy z brakującymi danymi wynosi 48, można stwierdzić, że niektóre rekordy posiadają więcej niż jedną wartość brakującą.
+
+```{r}
+miss_var_summary(rowery) 
+```
+
+Widzimy, że braki wystepują jedynie dla zmiennych gender (11 braków), cars (9 braków), children (8 braków), age (8 braków), marital_status (7 braków), income (6 braków) i home_owner (4 braki). Pozostałe zmienne nie posiadają żadnych wartości brakujących.
+
+```{r}
+rowery %>% 
+  miss_case_table()
+```
+
+Mamy 44 wiersze, w których brak jest jednej wartości, 3 wiersze z 2 brakami i jeden wiersz z 3 wartościami NA.
+
+```{r}
+which(is.na(rowery$gender))
+```
+
+Dla zmiennej 'gender' braki danych występują w wierszach: 4, 155, 336, 602, 689, 696, 868, 909, 952, 974, 998.
+
+```{r}
+which(is.na(rowery$cars)) 
+```
+
+Dla zmiennej 'cars' braki danych występują w wierszach: 13, 197, 203, 352, 449, 512, 562, 616, 934.
+
+```{r}
+which(is.na(rowery$children))
+```
+
+Dla zmiennej 'children' braki danych występują w wierszach: 118, 218, 387, 550, 639, 689, 806, 961.
+
+```{r}
+which(is.na(rowery$age)) 
+```
+
+Dla zmiennej 'age' braki danych występują w wierszach: 10, 99, 226, 372, 555, 689, 771, 987.
+
+```{r}
+which(is.na(rowery$marital_status)) 
+```
+
+Dla zmiennej 'marital_status' braki danych występują w wierszach: 9, 28, 50, 99, 151, 235, 302.
+
+```{r}
+which(is.na(rowery$income)) 
+```
+
+Dla zmiennej 'income' braki danych występują w wierszach: 10, 111, 192, 302, 442, 510.
+
+```{r}
+which(is.na(rowery$home_owner)) 
+```
+
+Dla zmiennej 'home_owner' braki danych występują w wierszach: 7, 366, 647, 944.
+
+#### 2. Sprawdzenie typów danych w każdej kolumnie
+
+Sprawdzenie typów danych w każdej kolumnie jest kluczowe dla zachowania poprawności, efektywności oraz precyzji analizy danych. Różne typy danych wymagają różnych operacji, a znajomość ich rodzaju pozwala na zastosowanie odpowiednich metod przetwarzania.
+
+```{r}
+data_class <- data.frame(class = sapply(rowery, class))
+data_class
+```
+
+#### 3. Sprawdzenie wiarygodności danych
+
+Poprzez wywołanie podstawowych statystyk możemy sprawdzić, czy nasze dane wydają się być wiarygodne, tzn. czy średnia ilość posiadanych dzieci, czy samochodów wydaje się być prawdopodobna. Ponadto użycie 'view(dfSummary(rowery))' dostarcza nam wielu cennych informacji m.in.:
+
+-   widzimy, że każdy klient posiada unikalne id,
+-   otrzymujemy podsumowanie braków obserwacji dla każdej zmiennej,
+-   dla zmiennych jakościowych widzimy możliwe kategorie wyboru wraz z informacją o częstości jej wystąpienia.
+
+```{r warning=FALSE}
+dfSummary(rowery)
+#view(dfSummary(rowery))
+descr(rowery)
+```
+
+#### 4. Sprawdzanie spełnienia pewnych reguł dla zbioru danych
+
+Posiadając już podstawową wiedzę na temat naszych danych, chcemy sprawdzić kilka podstawowych reguł:
+
+-   czy zmienna wiek na pewno wszędzie przyjmuje wartości dodatnie,
+-   czy liczba posiadanych dzieci nie jest nigdzie ujemna,
+-   czy liczba posiadanych samochodów nie jest ujemna,
+-   czy płeć przyjmuje jedną z dwóch kategorii 'kobieta' i 'mężczyzna'.
+
+Najpierw stwórzmy zbiór powyżej opisanych reguł.
+
+```{r}
+rules <- validator(age > 0, gender %in% c('Female','Male')
+                  , income >= 0, children >= 0, cars >= 0)
+rules
+```
+
+Sprawdźmy teraz, czy są one spełnione w naszym zbiorze danych.
+
+```{r}
+cf <- confront(rowery, rules, key="id")
+summary(cf)
+```
+
+Spełnienie reguł możemy również zwizualizować.
+
+```{r}
+barplot(cf, main="rowery") 
+```
+
+Moglibyśmy to również wykonać w inny sposób, który został przedstawiony poniżej. W razie niespełnienia którejkolwiek z reguł, błędna wartość zostałaby przekształcona na wartość 'NA'.
+
+```{r}
+RULE <- editset(c("age > 0","gender %in% c('Female','Male')"
+                  , "income >= 0", "children >= 0", "cars >= 0"))
+
+summary(violatedEdits(RULE, rowery))
+rowery[localizeErrors(RULE, rowery)$adapt] <- NA 
+```
+
+Okazuje się, że wszystkie reguły w naszym zbiorze danych są spełnione. Występujące błędy wynikają jedynie z występowania wartości brakujących, którymi zajmiemy się w następnym kroku.
+
+### 2. Imputacja danych
+
+Z analiz przeprowadzonych powyżej wynika, że w naszym zbiorze danych zlokalizowano 53 braki danych. W celu skutecznego zarządzania tymi brakami, podjęto decyzję o nieusuwanie żadnego z wierszy, a zamiast tego zastosowano różne metody imputacji wartości NA. Wybór konkretnych metod zależał od natury danych.
+
+#### 1. Imputacja-zmienne ilościowe
+
+Braki w zmiennych dotyczących dochodu, wieku, liczby posiadanych dzieci i samochodów wypełnione zostały za pomocą średniej. Ze względu na specyfikę danych 'age', 'children' i 'cars', wartości te nie powinny mieć żadnych miejsc po przecinku, gdyż nie możemy posiadać np. 1.5 dziecka.
+
+```{r}
+rowery[is.na(rowery$income), "income"] <- mean(rowery$income, na.rm = T)
+
+rowery[is.na(rowery$age), "age"] <- round(mean(rowery$age, na.rm = T), digits=0)
+
+rowery[is.na(rowery$cars), "cars"] <- round(mean(rowery$cars, na.rm = T), digits=0)
+
+rowery[is.na(rowery$children), "children"] <-round(mean(rowery$children, na.rm = T), digits=0)
+```
+
+#### 2. Imputacja-zmienne jakościowe
+
+Po uzupełnieniu braków w zmiennych ilościowych, przystępujemy teraz do korekty brakujących danych w przypadku zmiennych jakościowych. Ponieważ nasze zmienne jakościowe zawierają jedynie dwie kategorie, planujemy zidentyfikować, która z tych kategorii jest dominująca. Następnie, braki danych w tych zmiennych zostaną wypełnione wartościami dominującymi, czyli po prostu dominantą.
+
+Zacznijmy od zmiennej 'home_owner'. Widzimy, że przyjmuje ona dwie główne kategorie wyboru 'Yes' oraz 'No'. 68,2% klientów sklepu rowerowego posiada dom, więc braki w danych uzupełniamy wartością 'Yes'.
+
+```{r}
+unique(rowery$home_owner)
+rowery %>%
+  group_by(home_owner) %>%
+  count(home_owner) %>%
+summarize(proporcja=n/1000 * 100)
+
+rowery[is.na(rowery$home_owner), "home_owner"] <- "Yes"
+```
+
+Dla zmiennej 'marital_status' mamy dwie kategorie wyboru 'Married' i 'Single'. 53,5% klientów posiada męża bądź żonę, dlatego braki w danych wypełniamy wartością 'Married'.
+
+```{r}
+unique(rowery$marital_status)
+rowery %>%
+  group_by(marital_status) %>%
+  count(marital_status) %>%
+summarize(proporcja=n/1000 * 100)
+
+rowery[is.na(rowery$marital_status), "marital_status"] <- "Married"
+```
+
+Dla zmiennej 'gender' mamy dwie kategorie wyboru 'Male' i 'Female'. 50% klientów sklepu to mężczyźni, więc braki w danych uzupełniamy wartością 'Male'.
+
+```{r}
+unique(rowery$gender)
+rowery %>%
+  group_by(gender) %>%
+  count(gender) %>%
+summarize(proporcja=n/1000 * 100)
+
+rowery[is.na(rowery$gender), "gender"] <- "Male"
+```
+
+Upewnijmy się, że wszystko zadziałało, a w naszym zbiorze danych nie występują już żadne wartości brakujące.
+
+```{r}
+sum(is.na(rowery)) 
+```
+
+### 3. Obserwacje odstające
+
+Sprawdzanie zbioru danych pod kątem wartości odstających jest kluczowe dla utrzymania jakości analizy danych i poprawnego zrozumienia badanego zjawiska. W przypadku identyfikacji wartości odstających, istnieją różne metody ich obsługi, takie jak usuwanie, transformacja, czy stosowanie bardziej zaawansowanych technik modelowania.
+
+Przechodzimy więc do sprawdzenia naszego zbioru danych pod względem występowania wartości odstających.
+
+#### 1. Zlokalizowanie wartości odstających
+
+Możemy przykładowo stworzyć funkcję, która będzie wykrywać obserwacje odstające. Funkcja ta opiera się na metodzie Interquartile Range, gdzie za odstające wartości uznaje się te, które leżą poza pewnym zakresem określonym na podstawie pierwszego i trzeciego kwartyla.
+
+```{r}
+find_outliers <- function(rowery, k = 1.5) {
+quantiles <- quantile(rowery, c(0.25, 0.5, 0.75))
+diff <- k * (quantiles[3] - quantiles[1])
+lb <- quantiles[1] - diff 
+ub <- quantiles[3] + diff
+
+is_outlier <- rowery[which(rowery <lb | rowery > ub)]
+return(is_outlier)
+}
+
+find_outliers(rowery$income)
+```
+
+Inną metodą jest funkcja 'boxplot.stats' za pomocą której możemy wyświetlić wartości odstające. Widzimy, że mamy aż 10 wartości odstających dla zmiennej 'income'.
+
+```{r}
+out <-boxplot.stats(rowery$income)$out 
+out
+```
+
+Możemy również skorzystać z testów statystycznych. Analizując uzyskaną wartość p-value dla testu Grubbs'a przyjmujemy, że najwyższa wartość dla zmiennej 'income' równa 170 000 jest odstająca.
+
+```{r}
+test <- grubbs.test(rowery$income)
+test 
+```
+
+Przeprowadzamy test Grubbs'a dla najmniejszej wartości w zbiorze 'income'.
+
+```{r}
+test1 <- grubbs.test(rowery$income, opposite = TRUE)
+test1 
+```
+
+Zwizualizujmy teraz wartości odstające na wykresie wraz z opisem, które z nich są odstające.
+
+```{r}
+boxplot(rowery$income, col = "blue",
+  ylab = "income",
+  main = "Wykres pudełkowy dochodu")
+mtext(paste("Outliers: ", paste(out, collapse = ", ")))
+```
+
+Sprawdźmy jeszcze występowanie wartości odstających dla zmiennej 'age'. Okazuje się, że mamy 4 wartości odstającej dla tej zmiennej.
+
+```{r}
+boxplot.stats(rowery$age)$out
+```
+
+Wykonajmy jeszcze dodatkowo test Grubbs'a.
+
+```{r}
+test <- grubbs.test(rowery$age)
+test
+```
+
+#### 2. Przekształcenie wartości odstających
+
+Zdecydowaliśmy się przekształcić wartości odstające dla zmiennych "age" i "income" za pomocą metody capping. Metoda capping polega na ustaleniu górnej (max) i dolnej (min) granicy wartości dla danej zmiennej, a następnie przypisaniu wszystkim wartościom przekraczającym te granice wartości skrajnych.
+
+```{r}
+qnt <- quantile(rowery$income, probs=c(.25, .75), na.rm = T)
+caps <- quantile(rowery$income, probs=c(.05, .95), na.rm = T)
+H <- 1.5 * IQR(rowery$income, na.rm = T)
+rowery$income[rowery$income < (qnt[1] - H)] <- caps[1]
+rowery$income[rowery$income > (qnt[2] + H)] <- caps[2]
+```
+
+Sprawdźmy, czy wszystkie wartości odstające dla 'income' zostały przekształcone.
+
+```{r}
+boxplot.stats(rowery$income)$out
+```
+
+Tym samym sposobem przekształćmy wartości odstające dla zmiennej 'age'.
+
+```{r}
+qnt <- quantile(rowery$age, probs=c(.25, .75), na.rm = T)
+caps <- quantile(rowery$age, probs=c(.05, .95), na.rm = T)
+H <- 1.5 * IQR(rowery$age, na.rm = T)
+rowery$age[rowery$age < (qnt[1] - H)] <- caps[1]
+rowery$age[rowery$age > (qnt[2] + H)] <- caps[2]
+```
+
+Widzimy, że brak jest już wartości odstających dla zmiennej 'age'.
+
+```{r}
+boxplot.stats(rowery$age)$out
+```
+
+Kończymy pierwszy etap naszego projektu. Dzięki procesowi czyszczenia danych osiągnięto spójność w zbiorze danych. Brakujące wartości zostały uzupełnione, a błędy zostały skorygowane, co pozwali teraz na bardziej precyzyjną analizę. Otrzymaliśmy solidne fundamenty do przeprowadzenia bardziej zaawansowanych etapów projektu, takich jak wizualizacje, analiza opisowa, modelowanie czy wnioskowanie statystyczne.
+
+## II ETAP-WIZUALIZACJE
+
+Wizualizacje stanowią potężne narzędzie w każdym projekcie, wspomagają efektywną komunikację, lepsze zrozumienie danych oraz sprzyjają szybszemu i bardziej kreatywnemu podejmowaniu decyzji. Poniżej przedstawiono kilka ciekawych wizualizacji dla analizowanego przez nas zbioru danych.
+
+### 1.Średni dochód w zależności od wieku i płci
+
+Prezentowany wykres składa się z dwóch paneli, z których lewy reprezentuje dane dotyczące kobiet, natomiast prawy mężczyzn. Na obu panelach zaznaczone są czerwone punkty odzwierciedlające empiryczne dane dotyczące średnich dochodów w poszczególnych grupach wiekowych. Linie trendu w kolorze niebieskim zostały dopasowane do punktów, ukazując ogólny trend wzrostu średnich dochodów w miarę postępującego wieku. Warto zauważyć, że panel mężczyzn charakteryzuje się większym zróżnicowaniem (różnicą) średnich dochodów, jednocześnie prezentując wyższą średnią wartość dochodu. Dodatkowo, dla mężczyzn zauważalny jest silniejszy trend wzrostu średniego dochodu wraz z wiekiem. To sugeruje, że w miarę upływu lat różnice w dochodach między różnymi grupami wiekowymi mężczyzn mogą się nasilać, tworząc bardziej zauważalne tendencje wzrostowe.
+
+```{r}
+dw1<-rowery%>%
+  group_by(age, gender)%>%
+  summarize(meaninc=mean(income))
+ggplot(dw1, aes(age, meaninc))+
+  geom_line()+
+  geom_point(colour="red")+
+  facet_wrap(~gender)+labs(x="Wiek", y="Średnie dochody")+geom_smooth(method="lm")+ggtitle("Średni dochód w zależności od wieku oraz płci")
+```
+
+### 2. Występowanie obserwacji o określonym wieku i dochodzie
+
+Na poniższym wykresie przedstawiony został wykres punktowy. Każdy punkt na wykresie reprezentuje jeden przypadek. Wielkość punktu z kolei odpowiada częstości występowania obserwacji o określonym wieku i poziomie dochodów. Analizując wykres, można stwierdzić, że większość obserwacji skupia się w przedziale wiekowym 30-60 lat i niższym przedziale dochodowym.
+
+```{r}
+ggplot(rowery, aes(age, income))+
+  stat_sum(alpha=0.4)+
+  scale_size(range=c(1,5))+
+  ggtitle("Występowanie obserwacji o określonym wieku oraz poziomie dochodów")+labs(x="Wiek", y="Dochód", size="Występowanie")
+```
+
+### 3. Ilość posidanych samochodów w zależności od regionu
+
+Na poniższym wykresie pokazany jest stosunek liczby posiadanych samochodów w gospodarstwie domowym ze względu na region, z którego pochodzą klienci sklepu rowerowego. Rzuca sie w oczy fakt, że w Ameryce Północnej zdecydowanie najwięcej osób posiada 2 samochody. Region ten posiada również największy odsetek gospodarstw domowych z jednym samochodem. Najwięcej klientów nieposiadających samochodu zamieszkuje Europę. Na Pacyfiku jest tam najmniejszy odsetek gospodarstw bez samochodu. Ten region charakteryzuje się również najmniejszą dysproporcją jeżeli chodzi o liczbę samochodów.
+
+```{r}
+ggplot(rowery, aes(x=cars, fill=region))+
+  geom_bar(position="dodge")+
+  labs(x="Ilość posiadanych samochodów", y="Występowanie", fill="Region")
+```
+
+### 4.Zagęszczenie obserwacji o określonym wieku w zależności od regionu
+
+Poniższy wykres przedstawia rozkład wieku dla trzech różnych regionów: Europy, Ameryki Półnicnej i Pacyfiku. Oś pozioma (x) reprezentuje wiek, a oś pionowa (y) reprezentuje zagęszczenie, czyli estymowaną gęstość prawdopodobieństwa obserwacji w każdym punkcie osi wieku. W Europie największe zagęszczenie obserwacji występuje wśród osób w średnim wieku, z szczytem około 40 lat. Dla Ameryki Północnej rozkład wieku jest szerszy, z szczytem około 50 lat. Region Pacyfiku wydaje się mieć najszerszy rozkład wieku z największym zagęszczeniem wśród osób w wieku około 30 lat i stopniowym spadkiem w kierunku wyższych grup wiekowych. Rozkład wieku w Europie jest bardziej szpiczasty i mniej rozproszony niż w Ameryce Północnej, co może sugerować mniejszą różnorodność wieku w tym regionie. Linie obrysujące każdą z krzywych gęstości dają wyobrażenie o kształcie rozkładu dla każdego regionu, pozwalając dostrzec, gdzie znajdują się największe skupiska obserwacji.
+
+```{r}
+ggplot(rowery, aes(age, fill=region))+
+  geom_density(alpha=0.25)+
+  labs(x="Wiek",y="Zagęszczenie", fill="Region")+
+  ggtitle("Zagęszczenie obserwacji o określonym poziomie wieku w zależności od regionu")
+```
+
+### 5. Obserwacje o określonym poziomie dochodów w zależności od rodzaju zawodu
+
+Wykres poniżej jednoznacznie ilustruje, że dochody w poszczególnych grupach zawodowych są istotnie zróżnicowane. To zjawisko może być rezultatem różnic w wymaganiach, umiejętnościach, stopniu odpowiedzialności czy też specyfice poszczególnych zawodów. Pracownicy fizyczni najczęściej osiągają najniższe wynagrodzenia, podczas gdy pracownicy biurowi zarabiają nieco więcej. Wykwalifikowani pracownicy fizyczni cieszą się średnimi dochodami. Grupy zawodowe obejmujące pracowników profesjonalnych oraz na stanowiskach kierowniczych prezentują najwyższe wynagrodzenia. To zwykle osoby o zaawansowanych kwalifikacjach, odpowiedzialnościach zarządczych czy specjalistycznych umiejętnościach, co znajduje odzwierciedlenie w ich dochodach.
+
+```{r}
+ggplot(rowery, aes(income, fill=occupation))+
+  geom_histogram(bins=20, color='black')+
+  facet_wrap(~occupation, nrow=5)+
+  labs(x="Dochód", y="Występowanie", fill="Praca")+
+  theme(legend.position = 'none')+
+  ggtitle("Wystepowanie obserwacji o określonym poziomie dochodów w zależności od rodzaju zawodu")
+```
+
+### 6. Wizualizacja poziomu dochodu w zależności od płci
+
+Wykres poniżej pokazuje medianę dochodu, a także jego maksymalny, minimalny i średni poziom w zależności od płci. Mediana i średnie dochody są przedstawione na podobnym poziomie dla obu płci, z lekkim przesunięciem w kierunku wyższych wartości dla mężczyzn. Rozstęp dochodów, czyli różnica między kwartylem górnym a dolnym, również wydaje się być podobny dla obu grup.
+
+```{r}
+ggplot(rowery, aes(gender, income))+
+  geom_boxplot(aes(fill=gender))+
+  stat_boxplot(geom="errorbar",position="dodge")+
+  stat_summary(aes(ymin=after_stat(y),ymax=after_stat(y)),fun=mean)+ggtitle("Mediana dochodów, maksymalny, minimalny oraz średni dochód w zależności od płci")+theme(legend.position='none')
+```
+
+### 7. Ilość posiadanych samochodów w zależności od posiadania roweru
+
+Wykres poniżej może sugerować, że osoby posidające rower mają tendencję do posiadania mniejszej ilości samochodów niż osoby, które roweru nie posiadają.
+
+```{r}
+ggplot(rowery, aes(cars, fill=purchased_bike))+geom_histogram(bins=5, position="dodge", color='black')+facet_wrap(~purchased_bike)+theme(legend.position='none')+labs(x="Ilość posiadanych samochodów", y="Występowanie")+ggtitle("Ilość posiadanych samochodów w zależności od posiadania roweru")
+```
+
+### 8. Występowanie obserwacji o poszczególnym rodzaju wykonywanej pracy według wykształcenia
+
+Poniższy rysunek przedstawia występowanie obserwacji o poszczególnym rodzaju wykonywanej pracy według wykształcenia. Najwięcej osób z wykształceniem licencjackim pracuje na stanowisku kierownicznym albo jako profesjonalista. Natomiast najmniej na stanowisku urzędniczym. Jeśli chodzi o osoby z wykształceniem wyższym to także najwięcej osób pracuje na stanowisku kierowniczym (ok. 60 obserwacji). Najmniej osób pracuje na stanowisku pracy fizycznej (ok. 10 obserwacji). Spoglądając na osoby z wykształceniem licealnym to największa ich liczba jest zatrudniona na stanowisku fachowego pracownika fizycznego, jako profesjonalista i pracownik fizyczny (odpowiednio ok. 60, 50 i 40 obserwacji). Natomiast najmniej osób z tym wykształceniem jest zatrudnionych jako menedżer lub pracownik biurowy (ok. 10 i 5 obserwacji). Analizując rodzaj wykonywanej pracy przez osoby z nieskończonymi studiami wyższymi można zauważyć, iż największy udział pracujących to profesjonaliści (ok. 60 obserwacji), a najmniejszy dotyczy menedżerów (ok. 5 obserwacji). Analizując ostatnią kategorię wykształcenia, zaobserwowano tutaj najmniejszą liczbę obserwacji. Najwięcej osób z wykształceniem niepełnym licealnym jest zatrudnionych jako pracownik manualny (ok. 30 obsrwacji), a najmniej na stanowisku menedżera.
+
+```{r warning=FALSE}
+ggplot(rowery, aes(occupation, fill=occupation))+
+  geom_bar(color='black')+
+  facet_wrap(~education, nrow=5)+
+  labs(x="Zatrudnienie", y="Występowanie")+
+  theme(legend.position= 'none')+
+  ggtitle("Występowanie obserwacji o poszczególnym rodzaju wykonywanej pracy według wykształcenia")
+```
+
+### 9. Średni dochód według wykształcenia oraz rodzaju pracy
+
+Mapa cieplna jest pomocna w szybkim zrozumieniu, jak różne kombinacje wykształcenia i zawodu wpływają na dochód, gdzie ciemniejsze kolory wskazją na wyższe dochody, a jaśniejsze na niższe. Kategoria 'Management' wydaje się oferować najwyższe dochody niezależnie od poziomu wykształcenia. Z kolei prace biurowe i prace fizyczne mają tendencję do przynoszenia niższych dochodów.
+
+```{r}
+ggplot(rowery, aes(occupation, education, fill=income))+
+  geom_tile(color='black')+
+  scale_fill_gradient2(low="white", mid="yellow", high="red")+
+  ggtitle("Średni dochód według wykształcenia oraz rodzaju pracy")+labs(x="Zawód", y="Wykształcenie", fill="Dochód")
+```
+
+### 10. Analiza wieku według stanu cywilnego
+
+Obserwując wykres można zauważyć, że mediany wieku dla obu grup są różne-dla osób zamężnych/żonatych mediana jest wyższa niż dla osób stanu wolnego. Średni wiek w obu grupach wydaje się być zbliżony do mediany.
+
+```{r}
+ggplot(rowery, aes(marital_status, age))+
+  geom_boxplot(aes(fill=marital_status))+
+  stat_boxplot(geom="errorbar", position="dodge")+
+  stat_summary(aes(ymin=..y..,ymax=..y..), fun=mean)+
+  labs(x="Stan cywilny", y="Wiek")+
+  theme(legend.position='none')+
+  ggtitle("Mediana, maksimum, minimum oraz średnia wieku według stanu cywilnego")
+```
+
+### 11. Stan cywilny oraz region
+
+Zdecydowanie najwięcej osób zamężnych/żonatych wśród klientów sklepu rowerowego występowało w Ameryce Północnej. W Europie oraz na Pacyfiku występuje niemal identyczna ilość zarówno singli jak i osób po ślubie.
+
+```{r}
+ggplot(rowery, aes(marital_status, fill=marital_status))+
+  geom_bar(position="dodge")+
+  facet_wrap(~region)+
+  theme(legend.position='none')+
+  labs(x="Stan cywilny", y="Ilość")+
+  ggtitle("Ilość osób o poszczególnym stanie cywilnym w zależności od regionu")
+```
+
+## III ETAP-ANALIZA OPISOWA
+
+Analiza opisowa jest nieodzownym elementem każdego projektu. Dostarcza podstawowych informacji, które stanowią punkt wyjścia do bardziej zaawansowanych analiz statystycznych i pomagają zrozumieć istotę danych.
+
+### 1. Tabele liczebności
+
+W pierwszym etapie naszej analizy pogrupujemy nasze dane w postaci prostej tabeli częstości. Napotykamy tutaj jednak pewne problemy. Przykładowo zmienna 'income' jest zmienną ciągłą. Dokonamy więc diskretyzacji danych-przekształcimy zmienną ciągłą na zmienną dyskretną poprzez podział zakresu wartości na przedziały.
+
+#### 1. Zmienna ciągła 'income'
+
+Dla zmiennej 'income' stwórzmy sześć przedziałów.
+
+```{r}
+etykiety1<-c("0-25 000", "25 000-50 000", "50 000-75 000", "75 000-100 000", "100 000-125 000", "125 000-150 000")
+limits1<-cut(rowery$income,seq(0,150000,by=25000),labels=etykiety1)
+tabela2<-freq(limits1,type="html")
+tabela2
+```
+
+Możemy to również wykonać za pomocą innego sposobu. Uzyskany wskaźnik TAI jest dosyć wysoki, więc możemy zaakceptować konstrukcję tabeli częstości.
+
+```{r}
+tab1<-classIntervals(rowery$income,n=6,style="fixed",fixedBreaks=seq(0,150000,by=25000))
+tab1
+jenks.tests(tab1)
+```
+
+Zwizualizujmy nasz podział.
+
+```{r}
+hist(rowery$income, breaks="FD", col="green", probability = TRUE,
+     main="INCOME")
+```
+
+#### 2. Zmienna dyskretna 'age'
+
+Dla zmiennej 'age' również utwórzmy sześć przedziałów.
+
+```{r}
+etykiety<-c("20-30 lat","30-40 lat","40-50 lat","50-60 lat","60-70 lat","70-80 lat")
+limits<-cut(rowery$age,seq(20,80,by=10),labels=etykiety)
+tabela1<-freq(limits,type="html")
+tabela1
+```
+
+Uzyskany wskaźnik TAI jest dosyć wysoki, więc możemy zaakceptować konstrukcję tabeli częstości dla zmiennej 'age'.
+
+```{r}
+tab2<-classIntervals(rowery$age,n=6,style="fixed",fixedBreaks=seq(20,80,by=10))
+tab2
+jenks.tests(tab2)
+```
+
+Zwizualizujmy nasz podział.
+
+```{r}
+ggplot(rowery, aes(x = age)) +
+  geom_histogram(binwidth = 2, fill = "blue", color = "red", alpha = 0.8) +
+  labs(title = "Age Distribution", x = "Age", y = "Frequency")
+```
+
+#### 3. Pozostałe tabele/wykresy liczebności
+
+Liczebność pozostałych zmiennych możemy przedstawić na wiele różnych sposobów, zarówno za pomocą wykresów, jak i tabelek.
+
+Education: W naszym zbiorze danych obserwujemy najwięcej klientów z wykształceniem licencjackim.
+
+```{r}
+ggplot(rowery, aes(x = factor(education), fill = factor(education))) +
+  geom_bar() +
+  labs(title = "Education Distribution", x = "Education Level", y = "Count") +
+  theme_minimal()
+```
+
+Region: Najwięcej klientów pochodziło z Ameryki Północnej.
+
+```{r}
+ggplot(rowery, aes(x = factor(region), fill = factor(region))) +
+  geom_bar() +
+  labs(title = "Region Distribution", x = "Region", y = "Count") +
+  theme_minimal()
+```
+
+Możemy obliczyć ile kobiet i mężczyzn posiadało dany rodzaj wykształcenia.
+
+```{r}
+table(rowery$gender, rowery$education)
+```
+
+Czasami chcemy sporządzić rozkład liczebności pewnej zmiennej lub grupy zmiennych, ale tylko dla części respondentów, którzy spełniają określone warunki, na przykład respondentów będących w związku małżeńskim lub respondentów, którzy nie mają dzieci.
+
+W poniższym przykładzie widzimy, że najczęściej rowery kupowały osoby na wysokich stanowiskach (profesjonaliści) oraz wykwalifikowani pracownicy fizyczni.
+
+```{r}
+rower_zawod <- rowery %>%
+  filter(purchased_bike=="Yes") %>%
+  count(occupation) 
+rower_zawod
+```
+
+Osoby, które posiadały swój własny dom/mieszkanie były zdecydowanie bardziej skłonne do kupienia roweru.
+
+```{r}
+rower_dom <- rowery %>%
+  filter(purchased_bike=="Yes") %>%
+  count(home_owner) 
+rower_dom
+```
+
+Wyświetlając funkcje 'view(dfSummary(rowery))' możemy uzyskać liczebność kategorii dla wszystkich zmiennych jakościowych (zarówno liczbową, jak i procentową).
+
+### 2. Podstawowe statystyki opisowe
+
+Kolejnym etapem będzie przedstawienie podstawowych statystyk opisowych dla zmiennych ilościowych za pomocą zbiorczej tabelki.
+
+```{r}
+descr(rowery)
+```
+
+Możemy również przedstawić poszczególne statystyki opisowe dla zmiennej 'income' w zależności od innych zmiennych np. regionu czy wykonywanego zawodu, co zostało przedstawione poniżej.
+
+```{r}
+X <- rowery %>% 
+  group_by(region) %>%
+  summarize(Min=min(income),
+            Max=max(income),
+            średnia=mean(income),
+            odchylenie = sd(income),
+            mediana = median(income),
+            Q1=quantile(income,0.25),
+            Q3=quantile(income,0.75))
+X
+```
+
+Obserwujemy przykładowo, że średni dochód w Europie jest zdecydowanie niższy niż w Ameryce Północnej czy na Pacyfiku.
+
+```{r}
+Y <- rowery %>% 
+  group_by(occupation) %>%
+  summarize(Min=min(income),
+            Max=max(income),
+            średnia=mean(income),
+            odchylenie = sd(income),
+            mediana = median(income),
+            Q1=quantile(income,0.25),
+            Q3=quantile(income,0.75))
+Y
+```
+
+Na najwyższe średnie zarobki mogą liczyć pracownicy na stanowiskach kierowniczych.
+
+### 3. Korelacja
+
+Poniżej za pomocą różnych sposobów przedstawiona została korelacja pomiędzy zmiennymi ilościowymi.
+
+Tabelka korelacji: Największy poziom korelacji możemy zaobserwować pomiędzy wiekiem a liczbą posidanych dzieci (0.53).
+
+```{r}
+cor((rowery[,c(4,5,9,12)]), method="pearson")
+```
+
+Korelację możemy zwizualizować również za pomocą następujących wykresów.
+
+```{r}
+
+corrplot(cor(rowery[,c(4,5,9,12)]), method = "number", type = "upper", diag =FALSE)
+corr_matrix<-cor(rowery[,c(4,5,9,12)])
+corrplot(corr_matrix, method="color")
+```
+
+## IV ETAP- WNIOSKOWANIE STATYSTYCZNE
+
+Testowanie hipotez opiera się na założeniu pewnych warunków w populacji, a następnie analizie próby w celu zweryfikowania, czy dane założenie jest prawdziwe. Statystyki testowe i wartości p-value dostarczają nam narzędzi do dokładnego zrozumienia, czy obserwowane różnice między grupami czy parametrami są statystycznie istotne. Jako poziom istotności przyjęto wartość 0.05.
+
+### 1. Pytania badawcze
+
+-   Czy wartość dochodu jest zależna od regionu?
+-   Czy rodzaj wykonywanej pracy ma wpływ na fakt posiadania własnościowego domu/mieszkania?
+-   Czy osoby, które nie posiadają samochodu częściej kupują rowery?
+-   Czy poziom wykształcenia wpływa na przyszłe dochody?
+-   Czy w małżeństwach rodzi się więcej dzieci?
+
+#### 1. pytanie badawcze
+
+Dla zmiennych ,region' i 'income' zastosowano polecenie 'ggbetweenstats', adekwatne dla porównywania zmiennej jakościowej z ilościową. Przyjęto następujące hipotezy badawcze:
+
+H0: Dochód nie różni się istotnie w zależności od zamieszkiwanego regionu. H1: Dochód istotnie różni się w zależności od zamieszkiwanego regionu.
+
+Na podstawie wartości p-value można stwierdzić, że dochód istotnie różni się w zależności od regionu- należy odrzucić hipotezę zerową.
+
+```{r}
+ggbetweenstats(rowery, region, income)+ggtitle("Średni dochód w zależności od regionu")+labs(x="Region", y="Dochód")
+```
+
+#### 2. pytanie badawcze
+
+Dla zmiennych 'home_owner' i 'occupation' zastosowano funkcję 'ggbarstats', odpowiednią w przypadku porównywania ze sobą dwóch zmiennych jakościowych. Przyjęto następujące hipotezy: H0: Odsetek populacji posiadającej własny dom/mieszkanie nie różni się istotnie w zależności od wykonywanej pracy H1: Odsetek populacji posiadającej własny dom/mieszkanie różni się istotnie w zależności od wykonywanej pracy
+
+Na podstawie wartości p-value można stwierdzić, że odsetek populacji posiadającej własny dom bądź mieszkanie istotnie różni się w zależności od rodzaju wykonywanej pracy-należy przyjąć hipotezę alternatywną.
+
+```{r}
+ggbarstats(rowery, home_owner, occupation)+ggtitle("Posiadanie domu w zależności od rodzaju wykonywanej pracy")+labs(x="Zawód", y="Odsetek", fill="Posiadanie domu")
+```
+
+#### 3. pytanie badawcze
+
+Przyjęto następujące hipotezy badawcze: H0: Średnia liczba posidanych samochodów nie jest istotnie niższa wśród osób posidających rower H1: Średnia liczba posiadanych samochodów jest istotnie niższa wśród osób posidających rower
+
+Na podstawie wartości p-value można stwierdzić, że średnia liczba posiadanych samochodów jest istotnie niższa wśród osób posiadających rower- należy odrzucić hipotezę zerową.
+
+```{r}
+ggbetweenstats(rowery, purchased_bike, cars)+ggtitle("Ilość posiadanych samochodów w zależności od posiadania roweru")+labs(x="Posiadanie roweru", y="Ilość posiadanych samochodów")
+```
+
+#### 4. pytanie badawcze
+
+Przyjęto następujące hipotezy badawcze: H0: Średnie dochody nie różnią się istotnie w zależności od poziomu wykształcenia H1: Średnie dochody różnią się istotnie w zależności od poziomu wykształcenia
+
+Na podstawie otrzymanych wartości p-value można przyjąć, że średnie dochody istotnie różnią się w zależności od poziomu wykształcenia- należy przyjąc hipotezę alternatywną.
+
+```{r}
+ggbetweenstats(rowery, education, income)+ggtitle("Średnie dochody w zależności od poziomu wykształcenia")+labs(x="Wykształcenie", y="Dochody")
+```
+
+#### 5. pytanie badawcze
+
+Przyjęto następujące hipotezy badawcze: H0: Ilość posidanych dzieci nie różni się istotnie w zależności od stanu cywilnego H1: Ilość posiadanych dzieci różni się istotnie w zależności od stanu cywilnego
+
+Na podstawie wartości p-value dotyczącej całości obserwacji można przyjąć, że liczba posiadanych dzieci istotnie różni się w zależności od stanu cywilnego ankietowanej jednostki. Jednak przy analizie obserwacji dotyczącej wyłącznie osób posiadających dwójkę bądź trójkę dzieci, relacji pomiędzy liczbą dzieci, a stanem cywilnym nie można uznać za istotnie zróżnicowaną statystycznie z uwagi na wartość p-value przekraczającą przyjęty poziom istotności wynoszący 0.05.
+
+```{r}
+ggpiestats(rowery, marital_status, children)+ggtitle("Ilość posiadanych dzieci w zależności od stanu cywilnego")
+```
+
+### 2. Model logitowy
+
+Dla zmiennej 'purchased_bike' postanowiono stworzyć model logitowy, który ma za zadanie sprawdzić, jaki wpływ mają poszczególne zmienne na fakt, że klient zdecydował się na kupno roweru. Zmienna 'purchased_bike' jest jakościowa i przyjmuje dwie kategorie 'Yes' oraz 'No'. Za pomocą model.matrix zmienna ta została przekodowana tak, aby miała postać binarną, czyli przyjmowała tylko dwie wartości 0 dla 'No' i 1 dla 'Yes'. Zmienne o największej wartości p-value były stopniowo usuwane z początkowego modelu zgodnie z metodą a posteriori, tak, aby otrzymać ostateczny model końcowy- model7.
+
+Poniżej przedstawiona została postać wyjściowa modelu.
+
+```{r}
+encoded_data <- model.matrix(~purchased_bike - 1, data = rowery)
+
+model= glm(encoded_data ~ gender + marital_status + region + cars + income + age + occupation + education + home_owner + commute_distance, family = binomial, data=rowery)
+summary(model)
+```
+
+Kolejno zgodnie z metodą a posteriori usunięte zostały zmienne: commute_distance, gender, occupation, education, home_owner (w wymienionej kolejności). Poniżej przedstawiona została postać końcowa modelu po eliminacji wszystkich nieistotnych statystycznie zmiennych.
+
+```{r}
+model7= glm(encoded_data ~ marital_status  + cars + income + age, family = binomial, data=rowery)
+summary(model7)
+```
+
+Otrzymane współczynniki modelu nie nadają się do interpretacji, gdyż za ich pomocą możemy określić jedynie w jakim stopniu zmieniał się logit. Liczymy więc ilorazy szans, aby otrzymać wartości do interpretacji.
+
+```{r}
+OR=exp(model7$coefficients)
+OR
+```
+
+INTERPRETACJE: Jeżeli klient sklepu rowerowego jest singlem (w porównaniu do osób posiadających żonę/męża), to szanse na to, że kupi on rower maleją o około 40%. Z każdym posiadanym przez klienta samochodem, szanse na to, że kupi on rower wzrastają o około 67%. Wraz ze wzrostem wieku o 1 rok, szanse na to, że klient kupi rower wzrastają o około 1,19%. Wraz ze wzrostem dochodu, szanse na to, że klient kupi rower praktycznie się nie zmienniają. Wszelkie opisane zależności następują przy założeniu niezmienności pozostałych czynników- ceteris paribus.
+
+Możemy policzyć również efekty krańcowe, aby dowiedzieć się, jak poszczególne zmienne objaśniające wspływają na prawdopodobieństwo zakupu roweru przez klienta sklepu. Prawdopodobieństwo zsotało wyliczone przy założeniu średniego poziomu pozostałych zmiennych objaśniających.
+
+```{r}
+logitmfx(encoded_data ~ marital_status + cars + income + age, data= rowery)
+```
+
+Możemy również sprawdzić stopień dopasowania naszego modelu i stowrzyć wykres obrazujący punkty odcięcia oraz krzywą AUC.
+
+```{r}
+pred=prediction(model7$fitted.values, rowery$purchased_bike)
+pref=performance(pred, 'tpr', 'fpr')
+plot(pref, colorize= TRUE)
+performance(pred, 'auc')@y.values
+```
+
+AUC przyjmuje jednak dosyć niską wartość.
+
+#### PODSUMOWANIE
+
+Niniejszy projekt przebiegał w kilku kluczowych etapach. Początkowo nastąpiło przygotowanie danych do analizy. Dokonano imputacji 53 braków danych oraz przekształcono za pomocą metody capping wartości odstające dla zmiennych 'income' oraz 'age'. To tak naprawdę późniejsze etapy projektu stanowią źródło wiedzy i przedstawiają pewne wnioski, które mogą okazać się cenne z perspektywy kierownictwa sklepu rowerowego, ale także dla szerokiej gamy interesariuszy, zarówno w branży rowerowej, jak i poza nią z kilku powodów:
+
+Skoro dochód klientów istotnie różni się w zależności od regionu, to strategie cenowe i marketingowe sklepu powinny być dostosowane regionalnie. Sklep może oferować różne gamy produktów w różnych regionach, uwzględniając siłę nabywczą klientów.
+
+Fakt, że osoby posiadające rower mają średnio mniej samochodów, może wskazywać na ekologiczną świadomość lub ograniczenia finansowe. Sklep może więc promować rowery jako ekonomiczną i ekologiczną alternatywę transportu.
+
+Różnice w liczbie posiadanych dzieci w zależności od stanu cywilnego mogą być użyteczne przy tworzeniu ofert skierowanych do rodzin. Na przykład, sklep może oferować promocje na rowery dziecięce lub akcesoria dla rodzin. Analiza tej zależności może pomóc w decydowaniu, gdzie najlepiej otworzyć nowe sklepy lub zwiększyć działania marketingowe, kierując je na obszary o większej liczbie rodzin z dziećmi, które mogą być potencjalnymi klientami.
